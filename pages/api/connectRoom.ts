@@ -10,18 +10,19 @@ const twilioAccountSid = process.env.TWILIO_ACCOUNT_SID;
 const twilioApiKey = process.env.TWILIO_API_KEY;
 const twilioApiSecret = process.env.TWILIO_API_SECRET;
 
-const identity = "user";
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
+  console.log(JSON.parse(req.body));
+  const items = JSON.parse(req.body);
   const videoGrant = new VideoGrant({
-    room: "cool room",
+    room: items.roomName,
   });
   const token = new AccessToken(
     twilioAccountSid,
     twilioApiKey,
     twilioApiSecret,
-    { identity: identity }
+    { identity: items.userName }
   );
   token.addGrant(videoGrant);
 
-  res.status(200).json({ token: token.toJwt() });
+  res.status(200).json({ token: token.toJwt(), roomName: items.roomName });
 }

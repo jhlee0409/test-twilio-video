@@ -7,7 +7,7 @@ const client = require("twilio")(accountSid, authToken);
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
   const create = async () => {
     await client.video.v1.rooms
-      .create({ uniqueName: "DailyStandup" })
+      .create({ uniqueName: "123" })
       .then((room: any) => console.log(room.sid));
   };
   create();

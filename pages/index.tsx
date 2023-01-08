@@ -1,8 +1,7 @@
 import Head from "next/head";
 import Image from "next/image";
-import { Inter } from "@next/font/google";
 import styles from "../styles/Home.module.css";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import * as Video from "twilio-video";
 
 function participantConnected(participant: any) {
@@ -40,6 +39,57 @@ function trackUnsubscribed(track: any) {
 }
 
 export default function Home() {
+  const userNameRef = useRef<HTMLInputElement>(null);
+  const roomNameRef = useRef<HTMLInputElement>(null);
+  const connectRoom = async (roomName: string, userName: string) => {
+    await fetch("/api/connectRoom", {
+      method: "POST",
+      body: JSON.stringify({ roomName, userName }),
+    })
+      .then((res) => res.json())
+      .then((res) => {
+        console.log(res);
+        Video.createLocalTracks({
+          audio: false,
+          video: { width: 320 },
+        })
+          .then((localTracks) => {
+            return Video.connect(res.token, {
+              name: res.name,
+              tracks: localTracks,
+            });
+          })
+          .then(
+            (room) => {
+              console.log(`Connected to Room: ${room.name}`);
+              Video.createLocalVideoTrack().then((track) => {
+                const localMediaContainer =
+                  document.getElementById("local-media");
+                localMediaContainer!.appendChild(track.attach());
+              });
+              room.participants.forEach(participantConnected);
+              room.on("participantConnected", (participant) => {
+                console.log(`A remote Participant connected: ${participant}`);
+                participantConnected(participant);
+              });
+              room.on("participantDisconnected", participantDisconnected);
+              room.once("disconnected", (error) =>
+                room.participants.forEach(participantDisconnected)
+              );
+            },
+            (error) => {
+              console.error(`Unable to connect to Room: ${error.message}`);
+            }
+          );
+      });
+  };
+  const handleConnectRoom = () => {
+    if (!(userNameRef || roomNameRef)) return;
+    const roomName = roomNameRef.current!.value;
+    const userName = userNameRef.current!.value;
+    connectRoom(roomName, userName);
+  };
+
   useEffect(() => {
     const createRoom = async () => {
       await fetch("/api/createRoom")
@@ -48,25 +98,8 @@ export default function Home() {
           console.log(res);
         });
     };
-    const generateToken = async () => {
-      await fetch("/api/generateToken")
-        .then((res) => res.json())
-        .then((res) => {
-          console.log(res);
-          Video.connect(res.token, { name: "DailyStandup" }).then(
-            (room) => {
-              console.log(`Successfully joined a Room: ${room}`);
-              room.on("participantConnected", (participant) => {
-                console.log(`A remote Participant connected: ${participant}`);
-              });
-            },
-            (error) => {
-              console.error(`Unable to connect to Room: ${error.message}`);
-            }
-          );
-        });
-    };
-    generateToken();
+
+    // connectRoom();
     // createRoom();
   });
   return (
@@ -77,7 +110,14 @@ export default function Home() {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" href="/favicon.ico" />
       </Head>
-      <div>start</div>
+      <div>
+        roomName: <input type="text" ref={roomNameRef} />
+        userName: <input type="text" ref={userNameRef} />
+        <button type="button" onClick={handleConnectRoom}>
+          connect
+        </button>
+        <div id="local-media">local</div>
+      </div>
     </>
   );
 }

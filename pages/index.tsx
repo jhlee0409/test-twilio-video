@@ -1,11 +1,74 @@
-import Head from 'next/head'
-import Image from 'next/image'
-import { Inter } from '@next/font/google'
-import styles from '../styles/Home.module.css'
+import Head from "next/head";
+import Image from "next/image";
+import { Inter } from "@next/font/google";
+import styles from "../styles/Home.module.css";
+import { useEffect } from "react";
+import * as Video from "twilio-video";
 
-const inter = Inter({ subsets: ['latin'] })
+function participantConnected(participant: any) {
+  console.log('Participant "%s" connected', participant.identity);
+
+  const div = document.createElement("div");
+  div.id = participant.sid;
+  div.innerText = participant.identity;
+
+  participant.on("trackSubscribed", (track: any) =>
+    trackSubscribed(div, track)
+  );
+  participant.on("trackUnsubscribed", trackUnsubscribed);
+
+  participant.tracks.forEach((publication: any) => {
+    if (publication.isSubscribed) {
+      trackSubscribed(div, publication.track);
+    }
+  });
+
+  document.body.appendChild(div);
+}
+
+function participantDisconnected(participant: any) {
+  console.log('Participant "%s" disconnected', participant.identity);
+  document.getElementById(participant.sid)!.remove();
+}
+
+function trackSubscribed(div: any, track: any) {
+  div.appendChild(track.attach());
+}
+
+function trackUnsubscribed(track: any) {
+  track.detach().forEach((element: any) => element.remove());
+}
 
 export default function Home() {
+  useEffect(() => {
+    const createRoom = async () => {
+      await fetch("/api/createRoom")
+        .then((res) => res.json())
+        .then((res) => {
+          console.log(res);
+        });
+    };
+    const generateToken = async () => {
+      await fetch("/api/generateToken")
+        .then((res) => res.json())
+        .then((res) => {
+          console.log(res);
+          Video.connect(res.token, { name: "DailyStandup" }).then(
+            (room) => {
+              console.log(`Successfully joined a Room: ${room}`);
+              room.on("participantConnected", (participant) => {
+                console.log(`A remote Participant connected: ${participant}`);
+              });
+            },
+            (error) => {
+              console.error(`Unable to connect to Room: ${error.message}`);
+            }
+          );
+        });
+    };
+    generateToken();
+    // createRoom();
+  });
   return (
     <>
       <Head>
@@ -14,110 +77,7 @@ export default function Home() {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" href="/favicon.ico" />
       </Head>
-      <main className={styles.main}>
-        <div className={styles.description}>
-          <p>
-            Get started by editing&nbsp;
-            <code className={styles.code}>pages/index.tsx</code>
-          </p>
-          <div>
-            <a
-              href="https://vercel.com?utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              By{' '}
-              <Image
-                src="/vercel.svg"
-                alt="Vercel Logo"
-                className={styles.vercelLogo}
-                width={100}
-                height={24}
-                priority
-              />
-            </a>
-          </div>
-        </div>
-
-        <div className={styles.center}>
-          <Image
-            className={styles.logo}
-            src="/next.svg"
-            alt="Next.js Logo"
-            width={180}
-            height={37}
-            priority
-          />
-          <div className={styles.thirteen}>
-            <Image
-              src="/thirteen.svg"
-              alt="13"
-              width={40}
-              height={31}
-              priority
-            />
-          </div>
-        </div>
-
-        <div className={styles.grid}>
-          <a
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
-            className={styles.card}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <h2 className={inter.className}>
-              Docs <span>-&gt;</span>
-            </h2>
-            <p className={inter.className}>
-              Find in-depth information about Next.js features and&nbsp;API.
-            </p>
-          </a>
-
-          <a
-            href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
-            className={styles.card}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <h2 className={inter.className}>
-              Learn <span>-&gt;</span>
-            </h2>
-            <p className={inter.className}>
-              Learn about Next.js in an interactive course with&nbsp;quizzes!
-            </p>
-          </a>
-
-          <a
-            href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
-            className={styles.card}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <h2 className={inter.className}>
-              Templates <span>-&gt;</span>
-            </h2>
-            <p className={inter.className}>
-              Discover and deploy boilerplate example Next.js&nbsp;projects.
-            </p>
-          </a>
-
-          <a
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
-            className={styles.card}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <h2 className={inter.className}>
-              Deploy <span>-&gt;</span>
-            </h2>
-            <p className={inter.className}>
-              Instantly deploy your Next.js site to a shareable URL
-              with&nbsp;Vercel.
-            </p>
-          </a>
-        </div>
-      </main>
+      <div>start</div>
     </>
-  )
+  );
 }

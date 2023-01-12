@@ -12,6 +12,7 @@ const twilioApiSecret = process.env.TWILIO_API_SECRET;
 
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
   console.log(JSON.parse(req.body));
+
   const items = JSON.parse(req.body);
   const videoGrant = new VideoGrant({
     room: items.roomName,

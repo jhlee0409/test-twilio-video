@@ -1,46 +1,69 @@
+import axios from "axios";
 import Head from "next/head";
 import Image from "next/image";
-import styles from "../styles/Home.module.css";
 import { useEffect, useRef } from "react";
 import * as Video from "twilio-video";
+import styles from "../styles/Home.module.css";
 
-function participantConnected(participant: any) {
-  console.log('Participant "%s" connected', participant.identity);
-
-  const div = document.createElement("div");
-  div.id = participant.sid;
-  div.innerText = participant.identity;
-
-  participant.on("trackSubscribed", (track: any) =>
-    trackSubscribed(div, track)
-  );
-  participant.on("trackUnsubscribed", trackUnsubscribed);
-
-  participant.tracks.forEach((publication: any) => {
-    if (publication.isSubscribed) {
-      trackSubscribed(div, publication.track);
-    }
-  });
-
-  document.body.appendChild(div);
-}
-
-function participantDisconnected(participant: any) {
-  console.log('Participant "%s" disconnected', participant.identity);
-  document.getElementById(participant.sid)!.remove();
-}
-
-function trackSubscribed(div: any, track: any) {
-  div.appendChild(track.attach());
-}
-
-function trackUnsubscribed(track: any) {
-  track.detach().forEach((element: any) => element.remove());
-}
+const dataTrack = new Video.LocalDataTrack();
 
 export default function Home() {
   const userNameRef = useRef<HTMLInputElement>(null);
   const roomNameRef = useRef<HTMLInputElement>(null);
+
+  const receivePing = (name: any) => {
+    document.getElementById(
+      "pings"
+    )!.innerHTML += `<li>Ping from ${name}!</li>`;
+  };
+
+  function trackSubscribed(div: any, track: any) {
+    if (track.kind === "data") {
+      track.on("message", (data: any) => receivePing(data));
+      return;
+    }
+    div.appendChild(track.attach());
+  }
+
+  const sendPing = () => {
+    const value = document.getElementById("name")!.value;
+    dataTrack.send(value);
+    document.getElementById(
+      "pings"
+    )!.innerHTML += `<li>Ping from ${value}!</li>`;
+  };
+
+  function participantConnected(participant: any) {
+    console.log('Participant "%s" connected', participant.identity);
+
+    const div = document.createElement("div");
+    div.id = participant.sid;
+    div.innerText = participant.identity;
+
+    participant.on("trackSubscribed", (track: any) =>
+      trackSubscribed(div, track)
+    );
+
+    participant.on("trackUnsubscribed", trackUnsubscribed);
+
+    participant.tracks.forEach((publication: any) => {
+      if (publication.isSubscribed) {
+        trackSubscribed(div, publication.track);
+      }
+    });
+
+    document.body.appendChild(div);
+  }
+
+  function participantDisconnected(participant: any) {
+    console.log('Participant "%s" disconnected', participant.identity);
+    document.getElementById(participant.sid)!.remove();
+  }
+
+  function trackUnsubscribed(track: any) {
+    track.detach().forEach((element: any) => element.remove());
+  }
+
   const connectRoom = async (roomName: string, userName: string) => {
     await fetch("/api/connectRoom", {
       method: "POST",
@@ -56,17 +79,19 @@ export default function Home() {
           .then((localTracks) => {
             return Video.connect(res.token, {
               name: res.name,
-              tracks: localTracks,
+              tracks: [dataTrack],
             });
           })
           .then(
-            (room) => {
+            async (room) => {
               console.log(`Connected to Room: ${room.name}`);
-              Video.createLocalVideoTrack().then((track) => {
-                const localMediaContainer =
-                  document.getElementById("local-media");
-                localMediaContainer!.appendChild(track.attach());
-              });
+              const localMediaContainer =
+                document.getElementById("local-media");
+
+              const localVideoTrack = await Video.createLocalVideoTrack();
+
+              localMediaContainer!.appendChild(localVideoTrack.attach());
+
               room.participants.forEach(participantConnected);
               room.on("participantConnected", (participant) => {
                 console.log(`A remote Participant connected: ${participant}`);
@@ -90,18 +115,6 @@ export default function Home() {
     connectRoom(roomName, userName);
   };
 
-  useEffect(() => {
-    const createRoom = async () => {
-      await fetch("/api/createRoom")
-        .then((res) => res.json())
-        .then((res) => {
-          console.log(res);
-        });
-    };
-
-    // connectRoom();
-    // createRoom();
-  });
   return (
     <>
       <Head>
@@ -110,13 +123,27 @@ export default function Home() {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" href="/favicon.ico" />
       </Head>
+
       <div>
-        roomName: <input type="text" ref={roomNameRef} />
-        userName: <input type="text" ref={userNameRef} />
-        <button type="button" onClick={handleConnectRoom}>
-          connect
+        <div className={styles.formBox}>
+          <div>
+            roomName: <input type="text" ref={roomNameRef} />
+          </div>
+          <div>
+            userName: <input type="text" ref={userNameRef} />
+          </div>
+          <button type="button" onClick={handleConnectRoom}>
+            connect
+          </button>
+        </div>
+        name: <input type="text" id="name" />
+        <button onClick={sendPing} type="button">
+          ping
         </button>
-        <div id="local-media">local</div>
+        <div className={styles.localMedia} id="local-media">
+          local
+        </div>
+        <div className={styles.textBox} id="pings"></div>
       </div>
     </>
   );

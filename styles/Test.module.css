@@ -1,0 +1,79 @@
+.wrapper {
+  display: flex;
+  /* height: 360px; */
+}
+
+.chatBox {
+  border: 1px solid black;
+}
+
+.chatHistory {
+  height: 100%;
+  overflow: hidden;
+  padding: 10px;
+}
+
+.room * {
+  box-sizing: border-box;
+}
+
+.track video {
+  width: 100%;
+}
+
+.zoomIn {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 90vw;
+  /* height: auto; */
+}
+.zoomIn > video {
+  border: 5px solid blueviolet !important;
+}
+
+.participant {
+  position: relative;
+  width: 50vw;
+}
+
+.participant video {
+  border: 1px solid black;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.identity {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: #f1f1f1;
+  width: 30%;
+  text-align: center;
+  padding: 10px 0;
+  border-radius: 8px;
+  font-size: 16px;
+  color: black;
+  font-weight: bold;
+  letter-spacing: 2px;
+}
+
+.myChat {
+  text-align: right;
+}
+
+.layout {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.layout div {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}

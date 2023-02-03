@@ -77,3 +77,7 @@
   flex-direction: column;
   gap: 10px;
 }
+
+.audio {
+  display: none;
+}

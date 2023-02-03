@@ -1,13 +1,18 @@
+import moment from "moment";
 import { useRouter } from "next/router";
 import React, { useEffect, useRef, useState } from "react";
 import * as Video from "twilio-video";
 import styles from "../styles/Test.module.css";
-
+import { groupBy, values } from "lodash-es";
+let start: any = new Date().getTime();
+let isFirst = false;
+let screenTrack: any;
 const localDataTrack = new Video.LocalDataTrack();
 export type Nullable<T> = T | null;
 export default function App() {
+  const [duration, setDuration] = useState("");
+  const [screenShareList, setScreenShareList] = useState([]);
   const router = useRouter();
-  let screenTrack: any;
   const [startConnectingRoom, setStartConnectingRoom] = useState(false);
   const [localVideoTrack, setLocalVideoTrack] =
     useState<Video.LocalVideoTrack | null>(null);
@@ -22,18 +27,31 @@ export default function App() {
   const [remoteParticipants, setRemoteParticipants] = useState<any[]>([]);
 
   const sendChat = () => {
-    const value = chatRef.current!.value;
+    const value = chatRef.current!.value as string;
     if (!value) return;
-    localDataTrack.send(value);
+    localDataTrack.send(JSON.stringify({ value, type: "chat" }));
+    const currentTime = moment(new Date()).format("HH:mm");
     document.getElementById(
       "chatting"
-    )!.innerHTML += `<p class=${styles.myChat}>${value}</p>`;
+    )!.innerHTML += `<p class=${styles.myChat}>${value} ${currentTime}</p>`;
 
     chatRef.current!.value = "";
   };
 
-  const receiveChat = (value: any) => {
-    document.getElementById("chatting")!.innerHTML += `<p>${value}</p>`;
+  const receiveChat = (item: any) => {
+    const _item = JSON.parse(item);
+    if (_item.type === "screen") {
+      setScreenShareList(_item.value);
+      return;
+    }
+
+    if (typeof _item.value === "number") {
+      return (start = _item.value);
+    }
+    const currentTime = moment(new Date()).format("HH:mm");
+    document.getElementById(
+      "chatting"
+    )!.innerHTML += `<p>${_item.value} ${currentTime}</p>`;
   };
 
   const leaveRoom = () => {
@@ -46,6 +64,9 @@ export default function App() {
 
   const addParticipant = (participant: Video.RemoteParticipant) => {
     console.log(`Participant "${participant.identity}" connected`);
+    if (!isFirst) {
+      localDataTrack.send(start as any);
+    }
     participant.tracks.forEach((publication) => {
       if (publication.isSubscribed) {
         const track = publication.track as Video.RemoteTrack;
@@ -53,7 +74,10 @@ export default function App() {
           track.on("message", (data) => receiveChat(data));
           return;
         }
-        setRemoteParticipants((p) => [...p, { participant, track }]);
+        setRemoteParticipants((p) => [
+          ...p,
+          { id: participant.sid, participant, track },
+        ]);
       }
     });
     participant.on("trackSubscribed", (track) => {
@@ -61,7 +85,10 @@ export default function App() {
         track.on("message", (data) => receiveChat(data));
         return;
       }
-      setRemoteParticipants((p) => [...p, { participant, track }]);
+      setRemoteParticipants((p) => [
+        ...p,
+        { id: participant.sid, participant, track },
+      ]);
     });
   };
 
@@ -104,19 +131,18 @@ export default function App() {
         .then((room) => {
           setIdentify(nameRef.current!.value);
           setRoomName(roomNameRef.current!.value);
+          isFirst = room.participants.size === 0;
           room.participants.forEach(addParticipant);
           room.on(
             "participantConnected",
             (participant: Video.RemoteParticipant) =>
               addParticipant(participant)
           );
-
           room.on("participantDisconnected", removeParticipant);
           room.on("disconnected", (error) =>
             room.participants.forEach(removeParticipant)
           );
           room.on("trackUnpublished", (participant) => {
-            console.log("un", participant.trackName);
             document.getElementById(participant.trackName)!.remove();
             setRemoteParticipants((i) =>
               i.filter((p) => p.identity !== participant.trackName)
@@ -144,6 +170,11 @@ export default function App() {
 
   const handleLocalVideoControl = (e: React.ChangeEvent<HTMLInputElement>) => {
     room!.localParticipant.videoTracks.forEach((publication) => {
+      if (!screenTrack) {
+        return !e.target.checked
+          ? publication.track.enable()
+          : publication.track.disable();
+      }
       if (screenTrack && !(publication.track.id === screenTrack.name)) {
         !e.target.checked
           ? publication.track.enable()
@@ -155,6 +186,11 @@ export default function App() {
 
   const handleLocalAudioControl = (e: React.ChangeEvent<HTMLInputElement>) => {
     room!.localParticipant.audioTracks.forEach((publication) => {
+      if (!screenTrack) {
+        return !e.target.checked
+          ? publication.track.enable()
+          : publication.track.disable();
+      }
       if (screenTrack && !(publication.track.id === screenTrack.name)) {
         !e.target.checked
           ? publication.track.enable()
@@ -165,21 +201,38 @@ export default function App() {
     !e.target.checked ? localAudioTrack!.enable() : localAudioTrack!.disable();
   };
 
-  const zoomIn = () => {
-    const screenShared = document.getElementById("screen-shared")!;
-    if (screenShared.classList.length === 0) {
-      screenShared.classList.add(styles.zoomIn);
+  const zoomIn = (element: HTMLElement) => {
+    if (element.classList.length === 0) {
+      element.classList.add(styles.zoomIn);
       return;
     } else {
-      if (screenShared.classList.contains("zoomOut")) {
-        screenShared.classList.add(styles.zoomIn);
-        screenShared.classList.remove("zoomOut");
-      } else if (screenShared.classList.contains(styles.zoomIn)) {
-        screenShared.classList.add("zoomOut");
-        screenShared.classList.remove(styles.zoomIn);
+      if (element.classList.contains("zoomOut")) {
+        element.classList.add(styles.zoomIn);
+        element.classList.remove("zoomOut");
+      } else if (element.classList.contains(styles.zoomIn)) {
+        element.classList.add("zoomOut");
+        element.classList.remove(styles.zoomIn);
       }
     }
   };
+
+  const mkDeviceChangeHandler = (room: Video.Room) => async () => {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const audioDevices = devices.filter(
+      (device) => device.kind === "audioinput"
+    );
+    if (!audioDevices[0]) return;
+    const track = await Video.createLocalAudioTrack({
+      deviceId: { exact: audioDevices[0].deviceId },
+    });
+    room.localParticipant.audioTracks.forEach((publication) => {
+      publication.track.stop();
+      room.localParticipant.unpublishTrack(publication.track);
+    });
+    room.localParticipant.publishTrack(track);
+  };
+
+  // navigator.mediaDevices.ondevicechange = mkDeviceChangeHandler(room!);
 
   const handleScreenShare = async () => {
     if (!room) return;
@@ -192,13 +245,21 @@ export default function App() {
           screenTrack.mediaStreamTrack.onended = () => {
             handleScreenShare();
           };
+
           const localMediaContainer = document.getElementById("screen-media");
           const div = document.createElement("div");
           console.log("stream Track", stream.getTracks()[0]);
           div.id = `screen-shared`;
           div.appendChild(screenTrack.attach());
-          div.addEventListener("click", zoomIn);
+          div.addEventListener("click", () => zoomIn(div));
           localMediaContainer!.appendChild(div);
+
+          localDataTrack.send(
+            JSON.stringify({
+              value: stream.getTracks()[0].id,
+              type: "screen",
+            })
+          );
         })
         .catch(() => {
           alert("Could not share the screen.");
@@ -209,7 +270,6 @@ export default function App() {
       screenTrack = null;
       const localMediaContainer = document.getElementById("screen-media");
       const screenShared = document.getElementById("screen-shared")!;
-      console.log(localMediaContainer, screenShared);
       localMediaContainer?.removeChild(screenShared);
     }
   };
@@ -218,7 +278,23 @@ export default function App() {
     if (!room) return;
     console.log("room connected");
     local();
-    // return () => leaveRoom();
+    // const timeTracker = setInterval(() => {
+    //   const end = new Date().getTime();
+    //   const duration = end - start;
+    //   var tempTime = moment.duration(duration);
+    //   const hours = tempTime.hours() === 0 ? "" : `${tempTime.hours()}시 `;
+    //   const minutes =
+    //     tempTime.minutes() === 0 ? "" : `${tempTime.minutes()}분 `;
+    //   const seconds =
+    //     tempTime.seconds() === 0 ? "" : `${tempTime.seconds()}초 `;
+    //   var y = `${hours}${minutes}${seconds}지남`;
+    //   console.log(y);
+    //   setDuration(y);
+    // }, 1000);
+    return () => {
+      leaveRoom();
+      // clearInterval(timeTracker);
+    };
   }, [room]);
 
   return (
@@ -226,16 +302,17 @@ export default function App() {
       {room === null ? (
         <div className={styles.layout}>
           <div>
-            <input placeholder="room name" ref={roomNameRef} />
-            <input placeholder="What's your name?" ref={nameRef} />
+            <input placeholder="방이름" ref={roomNameRef} />
+            <input placeholder="유저 이름" ref={nameRef} />
             <button disabled={startConnectingRoom} onClick={joinRoom}>
-              Join Room
+              입장하기
             </button>
           </div>
         </div>
       ) : (
         <div className={styles.room}>
           <h1>room name : {roomName}</h1>
+          <h3>{duration}</h3>
           <div className={styles.wrapper}>
             <div className="participants">
               <div className={styles.participant} id={identity}>
@@ -261,14 +338,12 @@ export default function App() {
           </div>
           <div id="remote-media-div">
             remote
-            {remoteParticipants.map((item, i) => {
-              console.log(remoteParticipants);
-              if (item.track.kind === "audio") return null;
+            {values(groupBy(remoteParticipants, "id")).map((item: any[], i) => {
               return (
                 <Participant
-                  key={item.participant.identity + i}
-                  participant={item.participant}
-                  track={item.track}
+                  key={item[0].id}
+                  item={item}
+                  screenShareList={screenShareList}
                 />
               );
             })}
@@ -283,37 +358,72 @@ export default function App() {
 }
 
 const Participant = ({
-  participant,
-  track,
+  item,
+  screenShareList,
 }: {
-  participant: Video.Participant;
-  track: Video.RemoteTrack;
+  item: any[];
+  screenShareList: any[];
 }) => {
-  useEffect(() => {
-    console.log("track", track);
-  }, []);
-  if (track.kind === "data") return null;
-  if (track.kind === "audio") return <div>오디오</div>;
-
   return (
-    <div className={styles.participant} id={participant.sid}>
-      <span className={styles.identity}>{participant.identity}</span>
-      <Track key={track} track={track} />
+    <div className={styles.participant} id={item[0].participant.sid}>
+      <span className={styles.identity}>{item[0].participant.identity}</span>
+      {item.map((v, i) => {
+        return (
+          <Track
+            key={v.id + i}
+            track={v.track}
+            screenShareList={screenShareList}
+          />
+        );
+      })}
     </div>
   );
 };
 
-const Track = ({ track }: any) => {
+interface ITrackProps {
+  track: any;
+  screenShareList?: any[];
+}
+
+const Track = ({ track, screenShareList }: ITrackProps) => {
   const ref = useRef<HTMLDivElement>(null);
   const [toggle, setToggle] = useState(false);
+
+  const zoom = () => {
+    if (ref.current!.classList.contains("zoomOut")) {
+      ref.current!.classList.add(styles.zoomIn);
+      ref.current!.classList.remove("zoomOut");
+      return;
+    }
+    if (ref.current!.classList.contains(styles.zoomIn)) {
+      ref.current!.classList.add("zoomOut");
+      ref.current!.classList.remove(styles.zoomIn);
+      return;
+    }
+  };
+
   useEffect(() => {
     if (track && ref && ref.current && !ref.current.hasChildNodes()) {
+      if (screenShareList && zoom) {
+        if (screenShareList.includes(track.name)) {
+          console.log("is screenShared");
+          ref.current?.addEventListener("click", zoom);
+          ref.current?.classList.add("screen-shared");
+          ref.current?.classList.add("zoomOut");
+        }
+      }
       const child = track.attach();
-      const a = `${track.kind} ${track.name}`;
       ref.current.id = track.name;
       ref.current.classList.add(track.kind);
       ref.current.appendChild(child);
     }
   }, []);
-  return <div className={styles.track} ref={ref}></div>;
+  return (
+    <div
+      className={`${styles.track} ${
+        track.kind === "audio" ? styles.audio : ""
+      }`}
+      ref={ref}
+    ></div>
+  );
 };

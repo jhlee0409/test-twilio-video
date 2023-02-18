@@ -1,36 +1,43 @@
-This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# Twilio-Video SDK를 활용한 테스트 미팅
 
-## Getting Started
+자사 서비스 내에 사용할 미팅 서비스를 위한 테스트 프로젝트입니다.
 
-First, run the development server:
 
-```bash
-npm run dev
-# or
-yarn dev
+## STACK
+- next.js
+- Twilio-video
+
+
+## 기능
+- 1:1 미팅 (1:N 미팅 구현 예정)
+- 채팅
+- 화면 공유
+- 마이크/캠 on/off 기능
+
+
+## 실행 가이드
+
+
+1. 필요한 디펜던시들을 설치한다.
+```
+yarn install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2. Twilio에서 받은 키값들을 .env.local에 설정한다
+```env
+TWILIO_ACCOUNT_SID=*****************************
+TWILIO_API_KEY==*****************************
+TWILIO_API_SECRET==*****************************
+```
 
-You can start editing the page by modifying `pages/index.tsx`. The page auto-updates as you edit the file.
 
-[API routes](https://nextjs.org/docs/api-routes/introduction) can be accessed on [http://localhost:3000/api/hello](http://localhost:3000/api/hello). This endpoint can be edited in `pages/api/hello.ts`.
+3. 실행
+```
+yarn run dev
+```
 
-The `pages/api` directory is mapped to `/api/*`. Files in this directory are treated as [API routes](https://nextjs.org/docs/api-routes/introduction) instead of React pages.
+4. 방이름과 이름을 입력하고 입장하면 미팅이용이 가능하다.
+- 기본적으로 로컬에서만 동작하므로 실제로 미팅의 기능을 구해서는 배포를 해야한다.
 
-This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-optimization) to automatically optimize and load Inter, a custom Google Font.
 
-## Learn More
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
